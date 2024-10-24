@@ -1,0 +1,26 @@
+################################################################################
+## Copyright 2019-2020 Lawrence Livermore National Security, LLC and other
+## DiHydrogen Project Developers. See the top-level LICENSE file for details.
+##
+## SPDX-License-Identifier: Apache-2.0
+################################################################################
+
+# Emacs backup garbage
+.backup/
+.cache/
+
+# Other standard ignores
+*~
+*.pyc
+\#*#
+.#*
+.*.swp
+.DS_Store
+*.bak
+.dir-locals.el
+compile_commands.json
+
+# building/install not-entirely-out-of-source stuff
+build*/
+install*/
+

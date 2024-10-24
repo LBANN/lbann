@@ -1,0 +1,36 @@
+////////////////////////////////////////////////////////////////////////////////
+// Copyright 2014-2025 Lawrence Livermore National Security, LLC and other
+// LBANN Project Developers. See the top-level LICENSE file for details.
+//
+// SPDX-License-Identifier: Apache-2.0
+////////////////////////////////////////////////////////////////////////////////
+#pragma once
+
+// clang-format off
+#include <h2_config.hpp>
+#include <lbannv2_export.h>
+
+// Version information
+#define LBANNV2_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define LBANNV2_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define LBANNV2_VERSION_PATCH @PROJECT_VERSION_PATCH@
+#define LBANNV2_VERSION "@PROJECT_VERSION@"
+
+#cmakedefine01 LBANNV2_DEBUG_MODE
+
+#define LBANNV2_HAS_CUDA H2_HAS_CUDA
+#define LBANNV2_HAS_ROCM H2_HAS_ROCM
+#define LBANNV2_HAS_GPU (LBANNV2_HAS_CUDA + LBANNV2_HAS_ROCM)
+
+#cmakedefine01 LBANNV2_WITH_MI300A
+#cmakedefine01 LBANNV2_WITHOUT_MI300A
+#cmakedefine01 LBANNV2_UNKNOWN_MI300A
+
+#ifndef SPDLOG_ACTIVE_LEVEL
+// This defaults to "TRACE" so that all messages are compiled and
+// available. Use the runtime environment variable to control which
+// are seen.
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
+#endif
+
+// clang-format on

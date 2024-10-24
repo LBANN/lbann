@@ -1,0 +1,30 @@
+################################################################################
+## Copyright 2014-2025 Lawrence Livermore National Security, LLC and other
+## LBANN Project Developers. See the top-level LICENSE file for details.
+##
+## SPDX-License-Identifier: Apache-2.0
+################################################################################
+include("${CMAKE_CURRENT_LIST_DIR}/lbannv2ConfigVersion.cmake")
+set(LBANNv2_VERSION ${PACKAGE_VERSION})
+
+include(CMakeFindDependencyMacro)
+
+set(lbannv2_MINIMUM_H2_VERSION @lbannv2_MINIMUM_H2_VERSION@)
+set(lbannv2_MINIMUM_Torch_VERSION @lbannv2_MINIMUM_Torch_VERSION@)
+
+find_dependency(DiHydrogen
+  ${lbannv2_MINIMUM_H2_VERSION}
+  COMPONENTS Core Meta Patterns
+)
+find_dependency(Torch
+  ${lbannv2_MINIMUM_Torch_VERSION}
+)
+
+@PACKAGE_INIT@
+
+if (NOT TARGET lbann::lbannv2)
+  include("${CMAKE_CURRENT_LIST_DIR}/lbannv2Targets.cmake")
+endif ()
+
+check_required_components(lbannv2)
+set(LBANNv2_LIBRARIES lbann::lbannv2)

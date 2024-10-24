@@ -1,0 +1,67 @@
+################################################################################
+## Copyright 2014-2025 Lawrence Livermore National Security, LLC and other
+## LBANN Project Developers. See the top-level LICENSE file for details.
+##
+## SPDX-License-Identifier: Apache-2.0
+################################################################################
+[build-system]
+requires = [
+  "scikit-build-core>=0.10",
+  "pybind11"
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "lbannv2"
+version = "0.0.1"
+description = "LBANN's core integration with PyTorch"
+authors = [
+  { name = "Tal Ben Nun", email = "bennun2@llnl.gov" },
+  { name = "Tom Benson", email = "benson31@llnl.gov" },
+  { name = "Nikoli Dryden", email = "dryden1@llnl.gov" },
+  { name = "Pier Fiedorowicz", email = "fiedorowicz1@llnl.gov" },
+  { name = "Brian Van Essen", email = "vanessen1@llnl.gov" },
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+
+  "License :: OSI Approved :: Apache Software License",
+
+  "Programming Language :: C++",
+
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Software Development :: Version Control :: Git",
+
+  "Private :: Do Not Upload"
+  ]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+build-dir = "build"
+
+[tool.scikit-build.cmake]
+version = ">=3.30.0"
+
+[tool.scikit-build.ninja]
+version = ">=1.11"
+make-fallback = false
+
+[tool.scikit-build.wheel]
+expand-macos-universal-tags = true
+install-dir = "lbannv2"
