@@ -92,11 +92,6 @@ bool py_lbannv2_knows_ptr(at::Tensor const& t)
   return lbannv2::pointer_registry().known(t.const_data_ptr());
 }
 
-bool py_lbannv2_knows_ptr(at::Tensor const& t)
-{
-  return lbannv2::pointer_registry().known(t.const_data_ptr());
-}
-
 }  // namespace
 
 namespace _lbannv2
