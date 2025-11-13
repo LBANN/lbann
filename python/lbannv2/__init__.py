@@ -32,6 +32,11 @@ torch.utils.generate_methods_for_privateuse1_backend(
     unsupported_dtype=unsupported_dtype,
 )
 
+def is_available():
+    try:
+        return bool(is_lbannv2_gpu_available())
+    except Exception:
+        return False
 
 class MigratableMemory:
     """Use LBANNv2's allocator for the given device"""
