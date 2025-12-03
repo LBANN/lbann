@@ -6,7 +6,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "lbannv2/utils/device_helpers.hpp"
 #include "lbannv2/utils/errors.hpp"
 
 #include <ATen/NamedTensorUtils.h>
@@ -27,11 +26,6 @@ inline bool is_scalar(at::Tensor const& t)
   return t.defined() && (t.dim() == 0);
 }
 
-inline c10::Device get_underlying_device(at::Tensor const& t)
-{
-  return to_native(t.device());
-}
-
 inline void set_data_ptr_device(c10::DataPtr& dp, c10::Device d)
 {
   dp.unsafe_set_device(std::move(d));
@@ -40,11 +34,6 @@ inline void set_data_ptr_device(c10::DataPtr& dp, c10::Device d)
 inline void set_data_ptr_device(c10::Storage const& s, c10::Device d)
 {
   set_data_ptr_device(s.mutable_data_ptr(), std::move(d));
-}
-
-inline void set_data_ptr_device(at::Tensor const& t, c10::Device d)
-{
-  set_data_ptr_device(t.storage(), std::move(d));
 }
 
 inline void sync_metadata(at::Tensor const& src, at::Tensor& dst)
@@ -92,47 +81,6 @@ inline at::Tensor alias_as_device(at::Tensor const& orig_tensor,
                  "Aliasing tensor data has failed");
 
   return alias_tensor;
-}
-
-/** @brief Alias the tensor to the underlying device.
- *
- *  This effectively removes the LBANN/PrivateUse1 bits from the
- *  tensor's metadata. If the tensor is not an LBANN tensor to begin
- *  with, it just returns (a soft copy) of the input tensor.
- *
- *  @post The original tensor will keep its device type and keys, but
- *        its DataPtr will appear to be on the underlying device if
- *        queried.
- */
-inline at::Tensor alias_as_native_device(at::Tensor const& orig_tensor)
-{
-  if (!is_lbann(orig_tensor))
-    return orig_tensor;
-
-  // Get the original device (should be 'lbann'/'privateuseone') and
-  // the underlying device where the memory resides
-  // ('cpu'/'cuda'/etc); remove PrivateUse1 from the dispatch keyset.
-  return alias_as_device(orig_tensor,
-                         get_underlying_device(orig_tensor),
-                         orig_tensor.key_set().remove_backend(LBANNBit));
-}
-
-inline std::optional<at::Tensor>
-alias_as_native_device(std::optional<at::Tensor> const& t)
-{
-  if (t.has_value())
-    return alias_as_native_device(t.value());
-  return std::nullopt;
-}
-
-/** @brief Set the underlying DataPtr to the same device as input
- *
- *  @post `t.storage().data_ptr().device() == t.device()`
- */
-inline void sync_data_ptr_device(at::Tensor const& t)
-{
-  if (t.defined())
-    set_data_ptr_device(t, t.device());
 }
 
 /** @brief Minimal tensor stringification.

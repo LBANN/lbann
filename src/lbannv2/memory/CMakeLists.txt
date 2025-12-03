@@ -11,13 +11,11 @@ target_sources(lbannv2
   allocator.hpp
   h2_allocator_wrappers.hpp
   registry.hpp
-  toplevel_allocator.hpp
 )
 target_sources(lbannv2
   PRIVATE
   allocator.cpp
   registry.cpp
-  toplevel_allocator.cpp
 )
 
 if (LBANNV2_UNKNOWN_MI300A OR LBANNV2_WITH_MI300A)

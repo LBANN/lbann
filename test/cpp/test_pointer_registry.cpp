@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0
 ////////////////////////////////////////////////////////////////////////////////
 #include <lbannv2/memory/registry.hpp>
-#include <lbannv2/utils/device_helpers.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
@@ -377,8 +376,7 @@ TEST_CASE("PointerRegistry::unsafe_reset_allocator()", "[memory][registry]")
   void const* const mid_ptr = &buffer[6];
   void const* const bad_ptr = &buffer[0];
 
-  lbannv2::Allocator& alloc =
-    lbannv2::get_allocator({lbannv2::LBANNDeviceT, lbannv2::LBANN_CPU});
+  lbannv2::Allocator& alloc = lbannv2::get_allocator({c10::kCPU});
   lbannv2::Allocator* orig_alloc = &alloc;
 
   // FAKE -- DO NOT DEREFERENCE!

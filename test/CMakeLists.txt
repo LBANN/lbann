@@ -12,10 +12,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2)
 
 add_executable(catch-tests
-  cpp/test_device_helpers.cpp
-  cpp/test_empty_tensor.cpp
   cpp/test_pointer_registry.cpp
-  cpp/test_tensor_helpers.cpp
 )
 
 if (LBANNV2_UNKNOWN_MI300A OR LBANNV2_WITH_MI300A)

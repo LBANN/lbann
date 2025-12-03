@@ -54,14 +54,8 @@ test = ["pytest"]
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 build-dir = "build"
-
-[tool.scikit-build.cmake]
-version = ">=3.30.0"
-
-[tool.scikit-build.ninja]
-version = ">=1.11"
-make-fallback = false
-
-[tool.scikit-build.wheel]
-expand-macos-universal-tags = true
-install-dir = "lbannv2"
+cmake.version = ">=3.30.0"
+ninja.version = ">=1.11"
+ninja.make-fallback = false
+wheel.expand-macos-universal-tags = true
+wheel.install-dir = "lbannv2"

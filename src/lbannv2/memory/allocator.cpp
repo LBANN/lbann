@@ -8,7 +8,6 @@
 
 #include "lbannv2/memory/h2_allocator_wrappers.hpp"
 #include "lbannv2/memory/registry.hpp"
-#include "lbannv2/utils/device_helpers.hpp"
 #include "lbannv2/utils/errors.hpp"
 #include "lbannv2/utils/logging.hpp"
 
@@ -36,8 +35,7 @@ c10::DataPtr Allocator::allocate(size_t n)
 
 namespace
 {
-using alloc_map_type =
-  std::array<::lbannv2::Allocator*, ::lbannv2::NumLBANNDevices>;
+using alloc_map_type = std::array<::lbannv2::Allocator*, 1 + LBANNV2_HAS_GPU>;
 
 lbannv2::Allocator& get_cpu_allocator()
 {
@@ -74,33 +72,52 @@ alloc_map_type& alloc_map()
 lbannv2::Allocator& lbannv2::get_pinned_memory_allocator()
 {
   LBANNV2_WARN("No pinned allocator exposed yet; using regular CPU allocator.");
-  return get_allocator(c10::Device {LBANNDeviceT, LBANN_CPU});
+  return get_allocator(c10::Device {c10::kCPU});
 }
 
-lbannv2::Allocator& lbannv2::get_allocator(c10::Device const& lbann_device,
+lbannv2::Allocator& lbannv2::get_allocator(c10::Device const& device,
                                            bool pinned)
 {
-  LBANNV2_ASSERT_ALWAYS(is_lbann(lbann_device));
   if (pinned)
   {
-    LBANNV2_ASSERT_ALWAYS(lbann_device.index() == 0);
+    LBANNV2_ASSERT_ALWAYS(device.type() == c10::kCPU);
     return get_pinned_memory_allocator();
   }
 
-  auto const index = lbann_device.index();
+  size_t index = 0UL;
+  switch (device.type())
+  {
+  case c10::kCPU: index = 0UL; break;
+  case c10::kCUDA:
+  case c10::kHIP: index = 1UL; break;
+  default: throw std::runtime_error("lbannv2::get_allocator: bad device type");
+  }
 
-  LBANNV2_ASSERT_ALWAYS(0 <= index && index < NumLBANNDevices);
   auto* const alloc = alloc_map().at(index);
 
   LBANNV2_ASSERT_ALWAYS(static_cast<bool>(alloc));
   return *alloc;
 }
 
-void lbannv2::set_allocator(c10::Device const& lbann_device,
-                            Allocator* const alloc)
+void lbannv2::set_allocator(c10::Device const& device, Allocator* const alloc)
 {
-  LBANNV2_ASSERT_ALWAYS(is_lbann(lbann_device));
-  alloc_map().at(lbann_device.index()) = alloc;
+  LBANNV2_TRACE("lbannv2::set_allocator: device={}, alloc={}",
+                device.str(),
+                (void const*) alloc);
+
+  size_t index = 0UL;
+  switch (device.type())
+  {
+  case c10::kCPU: index = 0UL; break;
+  case c10::kCUDA:
+  case c10::kHIP: index = 1UL; break;
+  default: throw std::runtime_error("lbannv2::get_allocator: bad device type");
+  }
+  if (alloc_map().at(index) && alloc
+      && alloc_map().at(index)->get_device() == alloc->get_device())
+  {
+    alloc_map().at(index) = alloc;
+  }
 }
 
 void lbannv2::delete_managed_ptr(void* const ptr)

@@ -12,6 +12,11 @@ target_sources(_lbannv2
   PRIVATE
   register_lbannv2.cpp
   register_memory_funcs.cpp
-  register_ops.cpp
-  register_torch_support.cpp
 )
+
+if (LBANNV2_WITH_MI300A OR LBANNV2_UNKNOWN_MI300A)
+  target_sources(_lbannv2
+    PRIVATE
+    register_mi300a_ops.cpp
+  )
+endif ()

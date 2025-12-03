@@ -9,13 +9,11 @@ target_sources(lbannv2
   FILE_SET HEADERS
   FILES
   debugging_helpers.hpp
-  device_helpers.hpp
   errors.hpp
   logging.hpp
   tensor_helpers.hpp
 )
 target_sources(lbannv2
   PRIVATE
-  device_helpers.cpp
   logging.cpp
 )

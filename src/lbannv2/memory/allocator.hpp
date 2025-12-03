@@ -35,7 +35,7 @@ public:
   }
 };  // class Allocator
 
-LBANNV2_EXPORT Allocator& get_allocator(c10::Device const& lbann_device,
+LBANNV2_EXPORT Allocator& get_allocator(c10::Device const& device,
                                         bool pinned = false);
 
 LBANNV2_EXPORT Allocator& get_pinned_memory_allocator();

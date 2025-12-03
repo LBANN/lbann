@@ -35,10 +35,9 @@ set(CMAKE_HIP_FLAGS_DEBUG "-g3 -O0 -fno-omit-frame-pointer")
 # Just set things for CUDA *and* HIP hoping they'll be ignored on
 # irrelevant platforms.
 
-# Volta, ampere, hopper
-# FIXME (trb): Remove volta ASAP.
-set(CMAKE_CUDA_ARCHITECTURES 70 80 90)
-set(TORCH_CUDA_ARCH_LIST 7.0 8.0 9.0)
+# ampere, hopper
+set(CMAKE_CUDA_ARCHITECTURES 80 90)
+set(TORCH_CUDA_ARCH_LIST 8.0 9.0)
 set(CMAKE_CUDA_STANDARD 17)
 
 # MI50, MI250X, MI300A, MI300X
@@ -224,7 +223,7 @@ include(FetchContent)
 FetchContent_Declare(
   DiHydrogen
   GIT_REPOSITORY https://github.com/LLNL/DiHydrogen.git
-  GIT_TAG 3ecd2a51ad14c257c81cc5e121cf65f9900b7bcf # develop on 28 Jan 2025
+  GIT_TAG 5768324c035e9eb9870dfe21e658ed00b3a15483 # develop on 02 Dec 2025
   FIND_PACKAGE_ARGS
   NAMES DiHydrogen
   ${LBANNV2_MINIMUM_H2_VERSION}

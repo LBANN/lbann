@@ -6,7 +6,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include "lbannv2/ops/nonzero.hpp"
 #include <lbannv2/memory/allocator.hpp>
-#include <lbannv2/utils/device_helpers.hpp>
 #include <lbannv2/utils/logging.hpp>
 
 #include <h2/gpu/runtime.hpp>
@@ -80,7 +79,7 @@ __global__ void write_indices(int64_t* inp,
   }
 }
 
-// Majority from PyTorch. We removed use of host-based
+// NOTE (trb): Majority from PyTorch. We removed use of host-based
 // pinned_num_nonzeros_h. Instead we just sync the stream and use the
 // memory directly on the CPU. We also change
 // `const_data_ptr<scalar_t>()` to `static_cast<scalar_t
@@ -104,7 +103,7 @@ void nonzero_out_mi300a_impl(at::Tensor const& self, at::Tensor& out)
   }
   // compute number of nonzero elements
   size_t temp_storage_bytes = 0;
-  auto& allocator = lbannv2::get_allocator(lbannv2::to_lbann(self.device()));
+  auto& allocator = lbannv2::get_allocator(self.device());
   auto num_nonzeros = allocator.allocate(sizeof(int) * num_chunks);
   for (int64_t idx = 0; idx < num_chunks; idx++)
   {

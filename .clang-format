@@ -79,14 +79,18 @@ IncludeCategories:
     Priority:        -1
   - Regex:           '^((<|")lbannv2/)'   # Project headers
     Priority:         2
-  - Regex:           '^"[[:alnum:].]+\.h(pp)?"'   # Project headers
-    Priority:         2
   - Regex:           '^((<|")h2/)'   # Project headers
+    Priority:         2
+  - Regex:           '^"[[:alnum:]_.]+\.(hpp|cuh)"'   # Project headers
     Priority:         3
-  - Regex:           '<[[:alnum:].]+\.h(pp)?>'  # "Normal headers"
+  - Regex:           '^<[[:alnum:]_.]+\.(hpp|cuh)>'  # "Normal headers"
+    Priority:         4
+  - Regex:           '^(<(ATen|c10|torch|pybind11|python)/)'
     Priority:         4
   - Regex:           '<[[:alnum:]_]+>'          # STL Headers last
-    Priority:         5
+    Priority:         6
+  - Regex:           '*.h'
+    Priority:         7
 IncludeIsMainRegex: "(Test)?$"
 IndentCaseLabels: false
 IndentPPDirectives: None

@@ -7,7 +7,6 @@
 #pragma once
 
 #include <lbannv2/memory/allocator.hpp>
-#include <lbannv2/utils/device_helpers.hpp>
 
 #include <h2/gpu/memory_utils.hpp>
 #include <h2/gpu/runtime.hpp>

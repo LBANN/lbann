@@ -6,11 +6,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include <lbannv2_config.h>
 
-#include <lbannv2/backend/library_state.hpp>
 #include <lbannv2/memory/mi300a_allocator.hpp>
 #include <lbannv2/memory/registry.hpp>
 #include <lbannv2/ops/migrate.hpp>
-#include <lbannv2/utils/device_helpers.hpp>
 #include <lbannv2/utils/logging.hpp>
 #include <lbannv2/utils/tensor_helpers.hpp>
 
@@ -24,14 +22,24 @@ bool is_ok_device(c10::Device const& d)
 {
   // A device is ok if it is an LBANN device OR one of the native PyTorch
   // devices we support.
-  return lbannv2::is_lbann(d) || (d.type() == c10::kCPU)
+  return (d.type() == c10::kCPU)
 #if LBANNV2_HAS_GPU
          || (d.type() == c10::kCUDA
-             && (!d.has_index() || d.index() == lbannv2::state::gpu_idx()))
+             && (!d.has_index() || d.index() == h2::gpu::current_gpu()))
 #endif
     ;
 }
 
+c10::DispatchKeySet get_default_keyset(c10::Device const& d)
+{
+  switch (d.type())
+  {
+  case c10::kCPU: return c10::DispatchKeySet{c10::DispatchKey::CPU};
+  case c10::kCUDA: return c10::DispatchKeySet{c10::DispatchKey::CUDA};
+  default:
+    throw std::runtime_error("Unknown device type");
+  }
+}
 }  // namespace
 
 at::Tensor lbannv2::migrate(at::Tensor& t, c10::Device const& d)
@@ -72,10 +80,16 @@ at::Tensor lbannv2::migrate(at::Tensor& t, c10::Device const& d)
       t.storage().mutable_data_ptr(), d, c10::Stream {c10::Stream::DEFAULT, d});
 
     auto storage = t.storage();
-    auto out = at::detail::make_tensor<at::TensorImpl>(at::TensorImpl::VIEW,
-                                                       std::move(storage),
-                                                       get_default_keyset(d),
-                                                       t.dtype());
+    // FIXME (trb): I initially created this as a 'VIEW', but that
+    // puts it in "inference mode" (i.e., out.is_inference() == true).
+    // This is bad for training workloads. We may need to be a bit
+    // more careful in general here... E.g., migrating views to views,
+    // etc.
+    auto out =
+      at::detail::make_tensor<at::TensorImpl>(  // at::TensorImpl::VIEW,
+        std::move(storage),
+        get_default_keyset(d),
+        t.dtype());
     sync_metadata(t, out);
 
     return out;

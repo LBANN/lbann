@@ -9,7 +9,6 @@
 #include <lbannv2_config.h>
 
 #include <lbannv2/memory/allocator.hpp>
-#include <lbannv2/utils/device_helpers.hpp>
 #include <lbannv2/utils/logging.hpp>
 
 #include <h2/core/allocator.hpp>
@@ -61,7 +60,12 @@ public:
 
   c10::Device get_device() const noexcept final
   {
-    return c10::Device {LBANNDeviceT, D != h2::Device::CPU};
+#if LBANNV2_HAS_GPU
+    if constexpr (D == h2::Device::GPU)
+      return c10::Device {
+        c10::kCUDA, static_cast<c10::DeviceIndex>(h2::gpu::current_gpu())};
+#endif
+    return c10::Device {c10::kCPU};
   }
 
   ///@}

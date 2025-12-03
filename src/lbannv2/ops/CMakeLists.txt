@@ -4,18 +4,6 @@
 ##
 ## SPDX-License-Identifier: Apache-2.0
 ################################################################################
-target_sources(lbannv2
-  PUBLIC
-  FILE_SET HEADERS
-  FILES
-  copy.hpp
-  empty_tensor.hpp
-)
-target_sources(lbannv2
-  PRIVATE
-  copy.cpp
-  empty_tensor.cpp
-)
 
 # Note that LBANNV2_HAS_ROCM is implicit in either of these cases.
 #

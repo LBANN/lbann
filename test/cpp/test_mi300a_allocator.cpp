@@ -8,6 +8,7 @@
 #include <lbannv2/memory/registry.hpp>
 
 #include "test_helpers.hpp"
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
@@ -40,11 +41,12 @@ namespace
 {
 c10::Device lbann_cpu() noexcept
 {
-  return c10::Device {lbannv2::LBANNDeviceT, lbannv2::LBANN_CPU};
+  return c10::Device {c10::kCPU};
 }
 c10::Device lbann_gpu() noexcept
 {
-  return c10::Device {lbannv2::LBANNDeviceT, lbannv2::LBANN_GPU};
+  return c10::Device {c10::kCUDA,
+                      static_cast<c10::DeviceIndex>(h2::gpu::current_gpu())};
 }
 }  // namespace
 

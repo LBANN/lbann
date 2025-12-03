@@ -11,7 +11,6 @@ target_sources(lbannv2
   types.hpp
 )
 
-add_subdirectory(backend)
 add_subdirectory(memory)
 add_subdirectory(ops)
 add_subdirectory(utils)

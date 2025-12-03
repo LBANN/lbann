@@ -8,11 +8,9 @@
 
 #include "lbannv2/memory/mi300a_allocator.hpp"
 
-#include "lbannv2/backend/library_state.hpp"
 #include "lbannv2/memory/registry.hpp"
 #include "lbannv2/utils/errors.hpp"
 #include "lbannv2/utils/logging.hpp"
-
 #include <h2/core/sync.hpp>
 
 #include <c10/hip/HIPStream.h>
@@ -103,7 +101,10 @@ void MI300Allocator::raw_deallocate(void* ptr)
 
 c10::Device MI300Allocator::get_device() const noexcept
 {
-  return c10::Device {LBANNDeviceT, LBANN_CPU};
+  // FIXME (trb): What should we return here?? Either makes sense, but
+  // I think the prevailing use-case is that this allocates migratable
+  // CPU memory, so 'CPU' is probably more appropriate.
+  return c10::Device {c10::kCPU};
 }
 
 MI300Allocator& MI300Allocator::instance()
@@ -118,14 +119,12 @@ namespace
 {
 bool is_ok_device(c10::Device const& dev)
 {
-  return lbannv2::is_lbann(dev) || (dev.type() == c10::kCPU)
-         || (dev.type() == c10::kCUDA);
+  return (dev.type() == c10::kCPU) || (dev.type() == c10::kCUDA);
 }
 
 bool is_cpu_device(c10::Device const& dev)
 {
-  return (lbannv2::is_lbann(dev) && dev.index() == lbannv2::LBANN_CPU)
-         || (dev.type() == c10::kCPU);
+  return (dev.type() == c10::kCPU);
 }
 
 }  // namespace
@@ -163,7 +162,7 @@ void lbannv2::migrate_ptr(c10::DataPtr& ptr,
 
   {
     std::lock_guard<std::mutex> lock {cub_alloc.mutex};
-    BlkDesc key {ptr.get_context(), lbannv2::state::gpu_idx()};
+    BlkDesc key {ptr.get_context(), h2::gpu::current_gpu()};
 
     // Check that we only have one matching block
     LBANNV2_ASSERT(cub_alloc.live_blocks.count(key) == 1,
@@ -193,7 +192,7 @@ void lbannv2::migrate_ptr(c10::DataPtr& ptr,
   }
 
   // Update our internal bookkeeping
-  Allocator& new_allocator = get_allocator(to_lbann(to_device));
+  Allocator& new_allocator = get_allocator(to_device);
   ptr_registry.unsafe_reset_allocator(ptr.get_context(), &new_allocator);
 
   // Finally, update the DataPtr itself

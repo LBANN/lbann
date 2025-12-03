@@ -6,23 +6,24 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include <lbannv2_config.h>
 
-#include <lbannv2/backend/library_state.hpp>
 #include <lbannv2/memory/memory_utils.hpp>
 #include <lbannv2/memory/registry.hpp>
-#include <lbannv2/memory/toplevel_allocator.hpp>
-#include <lbannv2/utils/device_helpers.hpp>
 #include <lbannv2/utils/logging.hpp>
+
+#if LBANNV2_HAS_GPU
+#include <h2/gpu/runtime.hpp>
+#endif
 
 #if LBANNV2_WITH_MI300A || LBANNV2_UNKNOWN_MI300A
 #include <lbannv2/memory/mi300a_allocator.hpp>
 #include <lbannv2/ops/migrate.hpp>
 #endif
 
-#include <unordered_map>
-
 #include <c10/core/Device.h>
 #include <pybind11/pybind11.h>
 #include <torch/csrc/utils/pybind.h>
+
+#include <unordered_map>
 
 // FIXME (trb): WHERE TO PUT THIS???
 namespace
@@ -48,7 +49,7 @@ void use_lbannv2_allocator_for(c10::Device const& device)
 
   auto [it, _] = _wrapped_allocs.try_emplace(
     device_type,
-    lbannv2::get_allocator(lbannv2::to_lbann(device), false),
+    lbannv2::get_allocator(device, false),
     device);
   c10::SetAllocator(device_type, &(it->second));
 }
@@ -56,8 +57,11 @@ void use_lbannv2_allocator_for(c10::Device const& device)
 void use_lbannv2_allocators()
 {
   use_lbannv2_allocator_for(c10::kCPU);
-  if (lbannv2::state::has_gpu())
-    use_lbannv2_allocator_for({c10::kCUDA, lbannv2::state::gpu_idx()});
+#ifdef LBANNV2_HAS_GPU
+  if (h2::gpu::runtime_is_initialized())
+    use_lbannv2_allocator_for(
+      {c10::kCUDA, static_cast<c10::DeviceIndex>(h2::gpu::current_gpu())});
+#endif
 }
 
 void restore_default_allocator_for(c10::Device const& device)
@@ -74,10 +78,12 @@ void restore_default_allocator_for(c10::Device const& device)
 void restore_default_allocators()
 {
   restore_default_allocator_for(c10::kCPU);
-  if (lbannv2::state::has_gpu())
-    restore_default_allocator_for({c10::kCUDA, lbannv2::state::gpu_idx()});
+#ifdef LBANNV2_HAS_GPU
+  if (h2::gpu::runtime_is_initialized())
+    restore_default_allocator_for(
+      {c10::kCUDA, static_cast<c10::DeviceIndex>(h2::gpu::current_gpu())});
+#endif
 }
-
 
 #if LBANNV2_WITH_MI300A || LBANNV2_UNKNOWN_MI300A
 // Migrate
