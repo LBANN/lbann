@@ -223,7 +223,7 @@ include(FetchContent)
 FetchContent_Declare(
   DiHydrogen
   GIT_REPOSITORY https://github.com/LLNL/DiHydrogen.git
-  GIT_TAG 5768324c035e9eb9870dfe21e658ed00b3a15483 # develop on 02 Dec 2025
+  GIT_TAG 1bdd6830955c42027fb80bfe36dd09884dbdf036 # develop on 29 Dec 2025
   FIND_PACKAGE_ARGS
   NAMES DiHydrogen
   ${LBANNV2_MINIMUM_H2_VERSION}
