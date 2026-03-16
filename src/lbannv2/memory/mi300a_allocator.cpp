@@ -10,10 +10,18 @@
 
 #include "lbannv2/memory/registry.hpp"
 #include "lbannv2/utils/errors.hpp"
+#include "lbannv2/utils/gpu_utils.hpp"
 #include "lbannv2/utils/logging.hpp"
-#include <h2/core/sync.hpp>
 
+#if LBANNV2_HAS_CUDA
+#include <ATen/cuda/CUDAContextLight.h>
+#include <c10/cuda/CUDAStream.h>
+#elif LBANNV2_HAS_ROCM
+#include <ATen/hip/HIPContextLight.h>
 #include <c10/hip/HIPStream.h>
+#endif
+
+#include <c10/core/CachingDeviceAllocator.h>
 
 namespace
 {
@@ -32,15 +40,19 @@ bool use_nonblocking_stream()
 
 struct StreamRAII
 {
-  h2::gpu::DeviceStream stream;
+  lbannv2::c10_gpu::HIPStream stream;
+
   StreamRAII()
-    : stream {use_nonblocking_stream() ? h2::gpu::make_stream_nonblocking()
-                                       : h2::gpu::make_stream()} {};
+    : stream {lbannv2::c10_gpu::getStreamFromExternal(
+        use_nonblocking_stream() ? lbannv2::gpu::make_nonblocking_stream()
+                                 : lbannv2::gpu::make_stream(),
+        lbannv2::gpu::current_device())}
+  {}
   ~StreamRAII()
   {
     try
     {
-      h2::gpu::destroy(stream);
+      lbannv2::gpu::destroy_stream(stream.stream());
     }
     catch (...)
     {}
@@ -48,19 +60,26 @@ struct StreamRAII
 };  // struct StreamRAII
 
 // Internal stream for managing "host" allocations through CUB
-h2::gpu::DeviceStream host_allocation_stream()
+lbannv2::c10_gpu::HIPStream host_allocation_stream(c10::DeviceIndex const idx)
 {
-  static StreamRAII stream_raii;
-  return stream_raii.stream;
+  static std::vector<StreamRAII> stream_raii(lbannv2::gpu::num_devices());
+  LBANNV2_ASSERT_ALWAYS(idx >= 0 && idx < lbannv2::gpu::num_devices());
+  return stream_raii[idx].stream;
 }
 
-// FIXME: Implement this more robustly (probably requires LBANN
-// backend streams to be fleshed out, see how CUDA does this, e.g.).
-h2::gpu::DeviceStream get_raw_stream(c10::Stream const stream)
+c10::Device resolve_device(c10::Device const& d)
 {
-  return c10::hip::getCurrentHIPStream();
+  if (d.is_cuda() && !d.has_index())
+    return {c10::kCUDA, lbannv2::gpu::current_device()};
+
+  return d;
 }
 
+void delete_mi300a_ptr(void* ptr)
+{
+  lbannv2::pointer_registry().remove(ptr);
+  lbannv2::MI300Allocator::instance().raw_deallocate(ptr);
+}
 }  // namespace
 
 namespace lbannv2
@@ -70,10 +89,18 @@ MI300Allocator::MI300Allocator()
 {
 #if LBANNV2_WITHOUT_MI300A || LBANNV2_UNKNOWN_MI300A
 #if LBANNV2_UNKNOWN_MI300A
-  if (!h2::gpu::is_integrated())
+  if (!lbannv2::gpu::is_integrated())
 #endif
     throw std::runtime_error("MI300Allocator is only supported on MI300A");
 #endif
+
+  auto* const dev_alloc =
+    dynamic_cast<DeviceAlloc_t*>(at::cuda::getCUDADeviceAllocator());
+  LBANNV2_ASSERT_ALWAYS(dev_alloc);
+  if (!dev_alloc->initialized())
+    dev_alloc->init(gpu::num_devices());
+
+  alloc_ = dev_alloc;
 }
 
 void MI300Allocator::copy_data(void* const dst,
@@ -87,24 +114,33 @@ void MI300Allocator::copy_data(void* const dst,
 
 void* MI300Allocator::raw_allocate(size_t const nbytes)
 {
-  void* ptr;
-  H2_CHECK_HIP(h2::gpu::default_cub_allocator().DeviceAllocate(
-    &ptr, nbytes, host_allocation_stream()));
-  h2::gpu::sync(host_allocation_stream());
+  auto* const ptr = alloc_->raw_alloc_with_stream(
+    nbytes, host_allocation_stream(lbannv2::gpu::current_device()));
+
+  LBANNV2_TRACE(
+    "MI300Allocator::raw_allocate(nbytes={}): ptr={}, current_device={}",
+    nbytes,
+    ptr,
+    lbannv2::gpu::current_device());
+  lbannv2::gpu::sync(host_allocation_stream(lbannv2::gpu::current_device()));
+
   return ptr;
 }
 
 void MI300Allocator::raw_deallocate(void* ptr)
 {
-  H2_CHECK_HIP(h2::gpu::default_cub_allocator().DeviceFree(ptr));
+  LBANNV2_TRACE("MI300Allocator::raw_deallocate(ptr={})", ptr);
+  alloc_->raw_delete(ptr);
 }
 
 c10::Device MI300Allocator::get_device() const noexcept
 {
-  // FIXME (trb): What should we return here?? Either makes sense, but
-  // I think the prevailing use-case is that this allocates migratable
-  // CPU memory, so 'CPU' is probably more appropriate.
   return c10::Device {c10::kCPU};
+}
+
+c10::DeleterFnPtr MI300Allocator::raw_deleter() const
+{
+  return delete_mi300a_ptr;
 }
 
 MI300Allocator& MI300Allocator::instance()
@@ -115,86 +151,63 @@ MI300Allocator& MI300Allocator::instance()
 
 }  // namespace lbannv2
 
-namespace
+c10::DeviceIndex lbannv2::get_device_idx(void const* const ptr) noexcept
 {
-bool is_ok_device(c10::Device const& dev)
-{
-  return (dev.type() == c10::kCPU) || (dev.type() == c10::kCUDA);
+  int device_idx;
+  auto const hip_status = hipPointerGetAttribute(
+    &device_idx, HIP_POINTER_ATTRIBUTE_DEVICE_ORDINAL, const_cast<void*>(ptr));
+  if (hip_status == hipSuccess)
+  {
+    return static_cast<c10::DeviceIndex>(device_idx);
+  }
+  else
+  {
+    LBANNV2_DEBUG("lbannv2::get_device_idx(ptr={}) failed. Error: {}",
+                  ptr,
+                  hipGetErrorString(hip_status));
+    return -1;
+  }
 }
 
-bool is_cpu_device(c10::Device const& dev)
-{
-  return (dev.type() == c10::kCPU);
-}
-
-}  // namespace
-
+// Let's aim for a fully robust implementation here. We must consider:
+//   1. Migrating from D(:m) -> D(:m) is a no-op.
+//   2. Migrating from D:m -> D:n is a deep copy
 void lbannv2::migrate_ptr(c10::DataPtr& ptr,
                           c10::Device to_device,
                           c10::Stream with_stream)
 {
-  // Maybe a bit too permissive here, but let's be nice.
-  //
+  auto const real_tgt_device = resolve_device(to_device);
+
   // If no migration actually happens, just short-circuit...
-  if (ptr.device() == to_device)
+  if (ptr.device() == real_tgt_device)
     return;
 
 #if LBANNV2_WITHOUT_MI300A || LBANNV2_UNKNOWN_MI300A
 #if LBANNV2_UNKNOWN_MI300A
-  if (!h2::gpu::is_integrated())
+  if (!lbannv2::gpu::is_integrated())
 #endif
-    throw std::runtime_error("migrate_ptr is only supported on MI300A");
-#endif
-
-  // We can support any pointer from any backend that we have
-  // allocated using our CUB allocator.
-
-  auto& ptr_registry = pointer_registry();
-  LBANNV2_ASSERT(is_ok_device(ptr.device()) && is_ok_device(to_device),
-                 std::runtime_error,
-                 "Migrate: unsupported device");
-
-  // Find the live block in the cub allocator and replace the stream
-  using BlkDesc = typename h2::gpu::RawCUBAllocType::BlockDescriptor;
-  auto& cub_alloc = h2::gpu::default_cub_allocator();
-  auto new_stream = is_cpu_device(to_device) ? host_allocation_stream()
-                                             : get_raw_stream(with_stream);
-
   {
-    std::lock_guard<std::mutex> lock {cub_alloc.mutex};
-    BlkDesc key {ptr.get_context(), h2::gpu::current_gpu()};
-
-    // Check that we only have one matching block
-    LBANNV2_ASSERT(cub_alloc.live_blocks.count(key) == 1,
-                   std::runtime_error,
-                   "Migrate: pointer not managed by CUB!");
-
-    // Must be found because count(key) == 1.
-    auto blk_itr = cub_alloc.live_blocks.find(key);
-
-    // Iterators to keys are always const. However, the comparison
-    // function for "live_blocks" only compares ptr addrs and dev ids;
-    // it does NOT compare the streams. So we commit the following
-    // atrocity against, technically, the standard library:
-    BlkDesc& blk = const_cast<BlkDesc&>(*blk_itr);
-    blk.associated_stream = new_stream;
-    // The other (equivalent?) option would be to create a copy of the
-    // BlkDesc, set the proper stream, and then replace the block in
-    // the set. But that seems like too much work.
-    //
-    // It's annoying that the implementation uses multisets for both
-    // live and cached blocks (cached clearly makes sense -- it
-    // compares based on size, and there can be many allocs with the
-    // same size -- but I'm less clear on why live blocks are managed
-    // with one). I currently assert that the pointer is only
-    // registered once, but if that fails, we can replace this with a
-    // loop over 'equal_range()`.
+    throw std::runtime_error("migrate_ptr is only supported on MI300A");
   }
+#endif
 
-  // Update our internal bookkeeping
-  Allocator& new_allocator = get_allocator(to_device);
-  ptr_registry.unsafe_reset_allocator(ptr.get_context(), &new_allocator);
+  // Check that the migration is valid
+  auto const ptr_dev_idx = get_device_idx(ptr.get_context());
+  c10::Device const real_src_device = ptr_dev_idx == -1
+                                        ? c10::Device {c10::kCPU}
+                                        : c10::Device {c10::kCUDA, ptr_dev_idx};
+  LBANNV2_ASSERT(real_tgt_device.is_cpu() || real_src_device == real_tgt_device,
+                 std::runtime_error,
+                 "lbannv2::migrate_ptr: invalid src/tgt device combo");
+
+  // Update the stream
+  auto const new_stream = real_tgt_device.is_cpu()
+                            ? host_allocation_stream(ptr_dev_idx)
+                            : c10_gpu::HIPStream(with_stream);
+
+  // UGH. Oh well.
+  MI300Allocator().instance().alloc_->recordStream(ptr, new_stream);
 
   // Finally, update the DataPtr itself
-  ptr.unsafe_set_device(to_device);
+  ptr.unsafe_set_device(real_tgt_device);
 }

@@ -10,10 +10,12 @@ target_sources(lbannv2
   FILES
   debugging_helpers.hpp
   errors.hpp
+  gpu_utils.hpp
   logging.hpp
   tensor_helpers.hpp
 )
 target_sources(lbannv2
   PRIVATE
+  gpu_utils.cpp
   logging.cpp
 )

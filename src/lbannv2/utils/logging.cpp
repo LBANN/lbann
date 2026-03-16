@@ -106,6 +106,13 @@ std::shared_ptr<::spdlog::logger> make_default_logger()
 
 }  // namespace
 
+void lbannv2::set_log_level(std::string const& lvl_str)
+{
+  // Valid inputs: trace, debug, info, warn, error, critical, off
+  auto const lvl = spdlog::level::from_str(lvl_str);
+  lbannv2::default_logger()->set_level(lvl);
+}
+
 std::shared_ptr<::spdlog::logger>& lbannv2::default_logger()
 {
   static std::shared_ptr<::spdlog::logger> logger_ = make_default_logger();

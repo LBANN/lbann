@@ -6,17 +6,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include <lbannv2_config.h>
 
+#include <lbannv2/utils/gpu_utils.hpp>
 #include <lbannv2/utils/logging.hpp>
-
-#if LBANNV2_HAS_GPU
-#include <h2/gpu/runtime.hpp>
-#if LBANNV2_HAS_ROCM
-#include <c10/hip/HIPFunctions.h>
-#endif
-#if LBANNV2_HAS_CUDA
-#include <c10/cuda/CUDAFunctions.h>
-#endif
-#endif
 
 #include <c10/core/Device.h>
 #include <pybind11/pybind11.h>
@@ -48,7 +39,7 @@ void init_lbannv2()
 #if LBANNV2_HAS_GPU
   if (!_lbannv2_gpu_initialized)
   {
-    h2::gpu::init_runtime(at::cuda::current_device());
+    // There's nothing to do here since getting rid of H2.
     _lbannv2_gpu_initialized = true;
   }
 #endif
@@ -90,6 +81,9 @@ PYBIND11_MODULE(_lbannv2, m)
   m.def("is_lbannv2_gpu_available",
         &is_lbannv2_gpu_available,
         "Query whether LBANNv2 has GPU support.");
+  m.def("set_log_level",
+        &lbannv2::set_log_level,
+        "Set the output level for LBANNv2 logging.");
 
   _lbannv2::add_memory_funcs(m);
 }

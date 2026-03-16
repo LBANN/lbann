@@ -47,9 +47,9 @@ set(PYTORCH_ROCM_ARCH ${CMAKE_HIP_ARCHITECTURES})
 
 # Setup dependencies
 
-set(LBANNV2_MINIMUM_Python_VERSION 3.9)
+set(LBANNV2_MINIMUM_Python_VERSION 3.10)
 set(LBANNV2_MINIMUM_H2_VERSION 0.4.0)
-set(LBANNV2_MINIMUM_Torch_VERSION 2.6.0)
+set(LBANNV2_MINIMUM_Torch_VERSION 2.9.0)
 
 find_package(Python
   ${LBANNV2_MINIMUM_Python_VERSION}
@@ -152,22 +152,16 @@ find_library(TORCH_PYTHON_LIBRARY torch_python REQUIRED)
 set(LBANNV2_WITHOUT_MI300A ON)
 unset(LBANNV2_WITH_MI300A)
 unset(LBANNV2_UNKNOWN_MI300A)
+unset(LBANNV2_HAS_CUDA)
+unset(LBANNV2_HAS_ROCM)
 
 if (TARGET torch_cuda)
-  set(ALUMINUM_ENABLE_CUDA ON)
-  set(ALUMINUM_ENABLE_NCCL ON)
-
-  set(H2_ENABLE_CUDA ON)
-
+  set(LBANNV2_HAS_CUDA ON)
   # We need to edit out the CUDA arch flags out. Or at least edit them
   # down to supported archs (>=70).
 elseif (TARGET torch_hip)
   enable_language(HIP)
-
-  set(ALUMINUM_ENABLE_ROCM ON)
-  set(ALUMINUM_ENABLE_NCCL ON)
-
-  set(H2_ENABLE_ROCM ON)
+  set(LBANNV2_HAS_ROCM ON)
 
   # Handle MI300A configure checks.
   include(LBANNv2DetermineMI300A)
@@ -219,25 +213,20 @@ if (TORCH_CXX_FLAGS AND TORCH_CXX_FLAGS MATCHES "GLIBCXX_USE_CXX11_ABI=([01])")
   add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=${CMAKE_MATCH_1})
 endif ()
 
+# spdlog
 include(FetchContent)
 FetchContent_Declare(
-  DiHydrogen
-  GIT_REPOSITORY https://github.com/LLNL/DiHydrogen.git
-  GIT_TAG 1bdd6830955c42027fb80bfe36dd09884dbdf036 # develop on 29 Dec 2025
-  FIND_PACKAGE_ARGS
-  NAMES DiHydrogen
-  ${LBANNV2_MINIMUM_H2_VERSION}
-  COMPONENTS Core Meta Patterns
-  CONFIG
+  spdlog
+  GIT_REPOSITORY https://github.com/gabime/spdlog.git
+  GIT_TAG 79524ddd08a4ec981b7fea76afd08ee05f83755d # v1.17.0
+  GIT_SHALLOW 1
+  FIND_PACKAGE_ARGS CONFIG
 )
-FetchContent_MakeAvailable(DiHydrogen)
 
-if (DiHydrogen_FOUND)
-  message(STATUS "Found DiHydrogen: ${DiHydrogen_DIR}")
-  message(STATUS "DiHydrogen version: ${DiHydrogen_VERSION}")
-else ()
-  message(STATUS "Building DiHydrogen with FetchContent")
-endif ()
+# Ensure spdlog gets installed and exported properly. I can probably
+# make this a non-cached (or a FORCE'd) variable, but this is fine.
+set(SPDLOG_INSTALL ON CACHE INTERNAL "Install spdlog")
+FetchContent_MakeAvailable(spdlog)
 
 # Python module stuff
 find_package(pybind11 CONFIG REQUIRED)
@@ -260,8 +249,8 @@ target_sources(lbannv2
 )
 target_link_libraries(lbannv2
   PUBLIC
-  H2::H2Core
   torch
+  spdlog::spdlog
 )
 set_target_properties(lbannv2
   PROPERTIES

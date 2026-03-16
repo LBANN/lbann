@@ -44,7 +44,7 @@ public:
    *  @param[in] size The size in bytes of the allocated range.
    *  @param[in] allocator The allocator responsible for deleting the range.
    */
-  void add(void* ptr, size_t size, Allocator* allocator);
+  void add(void* ptr, size_t size, c10::Allocator* allocator);
 
   /** @brief Deregister an allocation.
    *
@@ -72,7 +72,7 @@ public:
    *  @throws UnknownAddress if the pointer is not part of a
    *          registered allocation.
    */
-  Allocator* get_allocator(void const* ptr) const;
+  c10::Allocator* get_allocator(void const* ptr) const;
 
   /** @brief Reset the allocator associated with a pointer.
    *
@@ -80,7 +80,7 @@ public:
    *  internal bookkeeping consistent. It should not be used outside
    *  of this context.
    */
-  void unsafe_reset_allocator(void const* ptr, Allocator* new_alloc);
+  void unsafe_reset_allocator(void const* ptr, c10::Allocator* new_alloc);
   // FIXME (trb): An alternative would be to make this similar to
   // "compare and swap" semantics (i.e., having to provide what the
   // user thinks the current allocator is); see also, replacing a
@@ -177,7 +177,7 @@ public:
   };
 
 private:
-  using MapType = std::map<KeyT, Allocator*, RangeLessAndDisjoint>;
+  using MapType = std::map<KeyT, c10::Allocator*, RangeLessAndDisjoint>;
   MapType m_registry;
   mutable std::mutex m_registry_mtx;
 };  // struct PointerRegistry

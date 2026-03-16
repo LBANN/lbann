@@ -376,11 +376,11 @@ TEST_CASE("PointerRegistry::unsafe_reset_allocator()", "[memory][registry]")
   void const* const mid_ptr = &buffer[6];
   void const* const bad_ptr = &buffer[0];
 
-  lbannv2::Allocator& alloc = lbannv2::get_allocator({c10::kCPU});
-  lbannv2::Allocator* orig_alloc = &alloc;
+  c10::Allocator& alloc = *c10::GetAllocator(c10::kCPU);
+  c10::Allocator* orig_alloc = &alloc;
 
   // FAKE -- DO NOT DEREFERENCE!
-  lbannv2::Allocator* other_alloc = ++orig_alloc;
+  c10::Allocator* other_alloc = ++orig_alloc;
 
   // Get the allocator setup
   REQUIRE_NOTHROW(registry.add(rng.first, rng_bytes(rng), orig_alloc));
@@ -435,5 +435,4 @@ TEST_CASE("PointerRegistry::bytes_registered()", "[memory][registry]")
   CHECK(registry.bytes_registered(mid_ptr) == rng_size);
   CHECK(registry.bytes_registered(extern_ptr_1) == 0UL);
   CHECK(registry.bytes_registered(extern_ptr_2) == 0UL);
-
 }

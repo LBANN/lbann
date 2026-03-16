@@ -24,7 +24,7 @@ authors = [
 ]
 license = { file = "LICENSE" }
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
 
@@ -47,6 +47,10 @@ classifiers = [
 
   "Private :: Do Not Upload"
   ]
+dependencies = [
+  "pybind11",
+  "torch>=2.9"
+  ]
 
 [project.optional-dependencies]
 test = ["pytest"]
@@ -59,3 +63,9 @@ ninja.version = ">=1.11"
 ninja.make-fallback = false
 wheel.expand-macos-universal-tags = true
 wheel.install-dir = "lbannv2"
+
+[tool.pytest]
+minversion = "9.0"
+testpaths = [
+    "test/py",
+]

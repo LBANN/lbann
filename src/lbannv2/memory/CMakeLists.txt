@@ -9,7 +9,7 @@ target_sources(lbannv2
   FILE_SET HEADERS
   FILES
   allocator.hpp
-  h2_allocator_wrappers.hpp
+  # h2_allocator_wrappers.hpp
   registry.hpp
 )
 target_sources(lbannv2

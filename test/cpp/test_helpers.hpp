@@ -8,6 +8,8 @@
 
 #include "lbannv2_config.h"
 
+#include <lbannv2/utils/gpu_utils.hpp>
+
 #include <catch2/catch_test_macros.hpp>
 
 #if LBANNV2_WITH_MI300A
@@ -19,7 +21,7 @@
 #define SKIP_WHEN_NO_MI300A()                                                  \
   do                                                                           \
   {                                                                            \
-    if (!h2::gpu::is_integrated())                                             \
+    if (!lbannv2::gpu::is_integrated())                                        \
     {                                                                          \
       SKIP("No MI300A support");                                               \
     }                                                                          \

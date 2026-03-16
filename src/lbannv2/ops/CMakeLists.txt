@@ -4,6 +4,16 @@
 ##
 ## SPDX-License-Identifier: Apache-2.0
 ################################################################################
+target_sources(lbannv2
+  PUBLIC
+  FILE_SET HEADERS
+  FILES
+  migrate.hpp
+)
+target_sources(lbannv2
+  PRIVATE
+  migrate.cpp
+)
 
 # Note that LBANNV2_HAS_ROCM is implicit in either of these cases.
 #
@@ -15,7 +25,6 @@ if (LBANNV2_UNKNOWN_MI300A OR LBANNV2_WITH_MI300A)
     PUBLIC
     FILE_SET HEADERS
     FILES
-    migrate.hpp
     nonzero.hpp
     scalar.hpp
   )

@@ -6,8 +6,15 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include <lbannv2/memory/mi300a_allocator.hpp>
 #include <lbannv2/memory/registry.hpp>
+#include <lbannv2/utils/gpu_utils.hpp>
 
 #include "test_helpers.hpp"
+
+#include <ATen/hip/HIPContextLight.h>
+#include <c10/core/Allocator.h>
+#include <c10/core/CPUAllocator.h>
+#include <c10/hip/HIPCachingAllocator.h>
+#include <c10/hip/HIPStream.h>
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
@@ -43,11 +50,11 @@ c10::Device lbann_cpu() noexcept
 {
   return c10::Device {c10::kCPU};
 }
-c10::Device lbann_gpu() noexcept
-{
-  return c10::Device {c10::kCUDA,
-                      static_cast<c10::DeviceIndex>(h2::gpu::current_gpu())};
-}
+// c10::Device lbann_gpu() noexcept
+// {
+//   return c10::Device {
+//     c10::kCUDA, static_cast<c10::DeviceIndex>(lbannv2::gpu::current_device())};
+// }
 }  // namespace
 
 TEST_CASE("MI300Allocator::allocate and MI300Allocator::deallocate",
@@ -57,41 +64,16 @@ TEST_CASE("MI300Allocator::allocate and MI300Allocator::deallocate",
 
   auto& alloc = lbannv2::MI300Allocator::instance();
   size_t const size = 64;
-  auto ptr = alloc.allocate(size);
-  CHECK(ptr.device() == lbann_cpu());
-  CHECK(lbannv2::pointer_registry().known(ptr.get()));
-}
 
-TEST_CASE("migrate_ptr CPU to GPU", "[memory][mi300a]")
-{
-  SKIP_WHEN_NO_MI300A();
+  void* raw_ptr = nullptr;
+  {
+    auto ptr = alloc.allocate(size);
+    raw_ptr = ptr.get();
+    CHECK(ptr.device() == lbann_cpu());
+    CHECK(lbannv2::pointer_registry().known(raw_ptr));
+  }
 
-  auto& alloc = lbannv2::MI300Allocator::instance();
-  size_t const size = 64;
-  auto ptr = alloc.allocate(size);
+  // DataPtr goes out of scope, should be deleted.
 
-  // Migrate to GPU
-  CHECK(lbannv2::pointer_registry().get_allocator(ptr.get_context()) == &alloc);
-  CHECK_NOTHROW(lbannv2::migrate_ptr(
-    ptr, lbann_gpu(), c10::Stream(c10::Stream::DEFAULT, lbann_gpu())));
-  CHECK(ptr.device() == lbann_gpu());
-  CHECK(lbannv2::pointer_registry().get_allocator(ptr.get_context())
-        == &lbannv2::get_allocator(lbann_gpu()));
-}
-
-TEST_CASE("migrate_ptr GPU to CPU", "[memory][mi300a]")
-{
-  SKIP_WHEN_NO_MI300A();
-
-  auto& alloc = lbannv2::get_allocator(lbann_gpu());
-  size_t const size = 64;
-  auto ptr = alloc.allocate(size);
-
-  // Migrate to CPU
-  CHECK(lbannv2::pointer_registry().get_allocator(ptr.get_context()) == &alloc);
-  CHECK_NOTHROW(lbannv2::migrate_ptr(
-    ptr, lbann_cpu(), c10::Stream(c10::Stream::DEFAULT, lbann_cpu())));
-  CHECK(ptr.device() == lbann_cpu());
-  CHECK(lbannv2::pointer_registry().get_allocator(ptr.get_context())
-        == &lbannv2::get_allocator(lbann_cpu()));
+  CHECK(!lbannv2::pointer_registry().known(raw_ptr));
 }

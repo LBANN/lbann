@@ -12,6 +12,8 @@ try:
 except ModuleNotFoundError:
     from .lib64._lbannv2 import *
 
+from ._automigrate import automigrate
+
 # Setup state needed by the library
 init_lbannv2()
 
@@ -25,10 +27,10 @@ class MigratableMemory:
     """Use LBANNv2's allocator for the given device"""
 
     def __enter__(self):
-        use_lbannv2_allocator_for(torch.device("cpu"))
+        use_mi300a_host_allocator()
 
     def __exit__(self, exc_type, exc_value, traceback):
-        restore_default_allocator_for(torch.device("cpu"))
+        use_pytorch_host_allocator()
 
 
 def make_migratory_tensor(ctor, *args, **kwargs):

@@ -13,9 +13,8 @@
 
 #if LBANNV2_WITH_MI300A || LBANNV2_UNKNOWN_MI300A
 #include <lbannv2/types.hpp>
+#include <lbannv2/utils/gpu_utils.hpp>
 #include <lbannv2/utils/logging.hpp>
-
-#include <h2/gpu/runtime.hpp>
 
 #include <ATen/core/TensorBase.h>
 #include <c10/core/Scalar.h>
@@ -34,7 +33,7 @@ at::Scalar mi300a_impl(at::Tensor const& self)
   // requirement for correctness, so we can assume the value can be
   // safely accessed.
   auto const stream = at::hip::getCurrentHIPStream();
-  h2::gpu::sync(stream);
+  lbannv2::gpu::sync(stream);
   return at::Scalar(*reinterpret_cast<ScalarT const*>(self.const_data_ptr()));
 }
 
@@ -57,7 +56,7 @@ at::Scalar mi300a_dispatch(at::Tensor const& self)
   }
 }
 }  // namespace
-#endif // LBANNV2_WITH_MI300A || LBANNV2_UNKNOWN_MI300A
+#endif  // LBANNV2_WITH_MI300A || LBANNV2_UNKNOWN_MI300A
 
 at::Scalar lbannv2::local_scalar_dense_hip(at::Tensor const& self)
 {
@@ -71,7 +70,7 @@ at::Scalar lbannv2::local_scalar_dense_hip(at::Tensor const& self)
 
 #if LBANNV2_WITH_MI300A || LBANNV2_UNKNOWN_MI300A
 #if LBANNV2_UNKNOWN_MI300A
-  if (h2::gpu::is_integrated())
+  if (lbannv2::gpu::is_integrated())
 #endif  // LBANNV2_UNKNOWN_MI300A
     return mi300a_dispatch(self);
 #endif  // LBANNV2_WITH_MI300A || LBANNV2_UNKNOWN_MI300A

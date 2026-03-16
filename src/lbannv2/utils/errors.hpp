@@ -6,12 +6,22 @@
 ////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <h2/utils/Error.hpp>
+#include <lbannv2_config.h>
 
-#define LBANNV2_ASSERT(...) H2_ASSERT(__VA_ARGS__)
+#define LBANNV2_ASSERT(cond, excpt, msg)                                       \
+  do                                                                           \
+  {                                                                            \
+    if (!(cond))                                                               \
+    {                                                                          \
+      throw excpt(msg);                                                        \
+    }                                                                          \
+  } while (0)
 
 #define LBANNV2_ASSERT_ALWAYS(cond)                                            \
-  H2_ASSERT_ALWAYS(cond, "Assertion \"" #cond "\" failed.")
+  LBANNV2_ASSERT(cond, std::runtime_error, "Assertion \"" #cond "\" failed.")
 
-#define LBANNV2_ASSERT_DEBUG(cond)                                             \
-  H2_ASSERT_DEBUG(cond, "Assertion \"" #cond "\" failed.")
+#if LBANNV2_DEBUG
+#define LBANNV2_ASSERT_DEBUG(cond) (void)
+#else
+#define LBANNV2_ASSERT_DEBUG(cond) LBANNV2_ASSERT_ALWAYS(cond)
+#endif

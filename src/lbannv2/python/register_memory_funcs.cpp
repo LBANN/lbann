@@ -8,92 +8,53 @@
 
 #include <lbannv2/memory/memory_utils.hpp>
 #include <lbannv2/memory/registry.hpp>
+#include <lbannv2/ops/migrate.hpp>
 #include <lbannv2/utils/logging.hpp>
 
 #if LBANNV2_HAS_GPU
-#include <h2/gpu/runtime.hpp>
+#include <lbannv2/utils/gpu_utils.hpp>
 #endif
 
-#if LBANNV2_WITH_MI300A || LBANNV2_UNKNOWN_MI300A
-#include <lbannv2/memory/mi300a_allocator.hpp>
-#include <lbannv2/ops/migrate.hpp>
-#endif
+#include <lbannv2/memory/allocator.hpp>
 
+#include <ATen/ops/to_native.h>
 #include <c10/core/Device.h>
 #include <pybind11/pybind11.h>
 #include <torch/csrc/utils/pybind.h>
+#include <torch/extension.h>
+#include <torch/library.h>
 
-#include <unordered_map>
-
-// FIXME (trb): WHERE TO PUT THIS???
 namespace
 {
-// These must persist -- following the letter of the c10 docs, the
-// alloc passed to SetAllocator must have static storage duration.
-// (However, I don't think this is actually all that essential in this
-// case because the deleter that's registered with created DataPtrs is
-// just a reference to the underlying allocator, which has static
-// storage duration independent of this nonsense.)
-std::unordered_map<c10::DeviceType, lbannv2::AllocatorWrapper> _wrapped_allocs;
-std::unordered_map<c10::DeviceType, c10::Allocator*> _alloc_stash;
-void use_lbannv2_allocator_for(c10::Device const& device)
-{
-  auto const device_type = device.type();
-  // We already own PU1 allocs; otherwise, check if we already own the alloc
-  if (device_type == c10::kPrivateUse1 || _alloc_stash.count(device_type))
-    return;
 
-  LBANNV2_TRACE("Using LBANNv2 allocator for device {}", device.str());
-
-  _alloc_stash[device_type] = c10::GetAllocator(device_type);
-
-  auto [it, _] = _wrapped_allocs.try_emplace(
-    device_type,
-    lbannv2::get_allocator(device, false),
-    device);
-  c10::SetAllocator(device_type, &(it->second));
-}
-
-void use_lbannv2_allocators()
-{
-  use_lbannv2_allocator_for(c10::kCPU);
-#ifdef LBANNV2_HAS_GPU
-  if (h2::gpu::runtime_is_initialized())
-    use_lbannv2_allocator_for(
-      {c10::kCUDA, static_cast<c10::DeviceIndex>(h2::gpu::current_gpu())});
-#endif
-}
-
-void restore_default_allocator_for(c10::Device const& device)
-{
-  auto it = _alloc_stash.find(device.type());
-  if (it != _alloc_stash.end())
-  {
-    LBANNV2_TRACE("Restoring default allocator for device {}", device.str());
-    c10::SetAllocator(device.type(), it->second);
-    _alloc_stash.erase(it);
-  }
-}
-
-void restore_default_allocators()
-{
-  restore_default_allocator_for(c10::kCPU);
-#ifdef LBANNV2_HAS_GPU
-  if (h2::gpu::runtime_is_initialized())
-    restore_default_allocator_for(
-      {c10::kCUDA, static_cast<c10::DeviceIndex>(h2::gpu::current_gpu())});
-#endif
-}
-
-#if LBANNV2_WITH_MI300A || LBANNV2_UNKNOWN_MI300A
 // Migrate
 at::Tensor py_migrate(at::Tensor& t, at::Device const& d)
 {
   return lbannv2::migrate(t, d);
 }
-#endif
 
-bool py_lbannv2_knows_ptr(at::Tensor const& t)
+bool py_supports_migrate() noexcept
+{
+#if LBANNV2_WITH_MI300A
+  return true;
+#elif LBANNV2_HAS_GPU
+  return lbannv2::gpu::is_integrated();
+#else
+  return false;
+#endif
+}
+
+void py_use_mi300a_host_allocator()
+{
+  lbannv2::use_mi300a_cpu_allocator();
+}
+
+void py_use_torch_host_allocator()
+{
+  lbannv2::use_torch_cpu_allocator();
+}
+
+bool py_using_lbannv2_memory(torch::Tensor const& t)
 {
   return lbannv2::pointer_registry().known(t.const_data_ptr());
 }
@@ -105,31 +66,27 @@ namespace _lbannv2
 
 void add_memory_funcs(pybind11::module_& m)
 {
-  // Memory knowledge
-  m.def("using_lbannv2_memory",
-        &py_lbannv2_knows_ptr,
-        "Determine if the tensor is backed by LBANNv2 memory");
-
-#if LBANNV2_WITH_MI300A || LBANNV2_UNKNOWN_MI300A
   // Pointer migration
+  m.def("supports_migrate",
+        &py_supports_migrate,
+        "Determine whether device migration is supported");
+
   m.def("migrate",
         &py_migrate,
-        "Migrate an LBANNv2-owned pointer to a new device.");
-#endif
+        "Try to migrate an LBANNv2-owned pointer to a new device.");
 
-  // Allocator management
-  m.def("use_lbannv2_allocator_for",
-        &use_lbannv2_allocator_for,
-        "Replace a Torch/C10 allocator with the LBANNv2 allocator");
-  m.def("use_lbannv2_allocators",
-        &use_lbannv2_allocators,
-        "Replace all Torch/C10 allocators with their LBANNv2 counterparts");
-  m.def("restore_default_allocator_for",
-        &restore_default_allocator_for,
-        "Restore the Torch/C10 for the given device.");
-  m.def("restore_default_allocators",
-        &restore_default_allocators,
-        "Restore all Torch/C10 allocators");
+  m.def("use_mi300a_host_allocator",
+        &py_use_mi300a_host_allocator,
+        "Use the LBANNv2 MI300A allocator for CPU allocations");
+
+  m.def("use_pytorch_host_allocator",
+        &py_use_torch_host_allocator,
+        "Use the default pytorch CPU allocator for CPU allocations");
+
+  m.def(
+    "using_lbannv2_memory",
+    &py_using_lbannv2_memory,
+    "Determine whether LBANNv2 allocated the memory backing a given tensor");
 }
 
 }  // namespace _lbannv2

@@ -55,4 +55,12 @@ namespace lbannv2
  *  @todo Enable logging to a process-specific file.
  */
 std::shared_ptr<::spdlog::logger>& default_logger();
+
+/** @brief Set the logging level.
+ *
+ *  \param[in] level Desired log level. Valid choices are "trace", "debug",
+ *                   "info", "warn", "error", "critical", and "off".
+ */
+void set_log_level(std::string const& level);
+
 }  // namespace lbannv2

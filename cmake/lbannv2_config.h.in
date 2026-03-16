@@ -7,7 +7,7 @@
 #pragma once
 
 // clang-format off
-#include <h2_config.hpp>
+
 #include <lbannv2_export.h>
 
 // Version information
@@ -18,8 +18,8 @@
 
 #cmakedefine01 LBANNV2_DEBUG_MODE
 
-#define LBANNV2_HAS_CUDA H2_HAS_CUDA
-#define LBANNV2_HAS_ROCM H2_HAS_ROCM
+#cmakedefine01 LBANNV2_HAS_CUDA
+#cmakedefine01 LBANNV2_HAS_ROCM
 #define LBANNV2_HAS_GPU (LBANNV2_HAS_CUDA + LBANNV2_HAS_ROCM)
 
 #cmakedefine01 LBANNV2_WITH_MI300A

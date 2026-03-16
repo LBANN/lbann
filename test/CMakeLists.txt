@@ -4,6 +4,7 @@
 ##
 ## SPDX-License-Identifier: Apache-2.0
 ################################################################################
+include(FetchContent)
 FetchContent_Declare(
   Catch2
   GIT_REPOSITORY https://github.com/catchorg/Catch2

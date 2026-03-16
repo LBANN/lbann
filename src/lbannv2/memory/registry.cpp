@@ -35,8 +35,11 @@ namespace lbannv2
 
 void PointerRegistry::add(void* const ptr,
                           size_t const size,
-                          Allocator* const allocator)
+                          c10::Allocator* const allocator)
 {
+  if (!ptr)
+    return;
+
   std::lock_guard<std::mutex> lock(m_registry_mtx);
   auto const [it, added] = m_registry.emplace(
     KeyT {ptr, static_cast<std::byte*>(ptr) + size}, allocator);
@@ -51,6 +54,9 @@ void PointerRegistry::add(void* const ptr,
 
 void PointerRegistry::remove(void* const ptr)
 {
+  if (!ptr)
+    return;
+
   std::lock_guard<std::mutex> lock(m_registry_mtx);
   auto const it = m_registry.find(ptr);
   if (it == m_registry.cend())
@@ -75,7 +81,7 @@ bool PointerRegistry::known(void const* const ptr) const noexcept
   return m_registry.contains(ptr);
 }
 
-Allocator* PointerRegistry::get_allocator(void const* const ptr) const
+c10::Allocator* PointerRegistry::get_allocator(void const* const ptr) const
 {
   std::lock_guard<std::mutex> lock(m_registry_mtx);
   auto const it = m_registry.find(ptr);
@@ -85,7 +91,7 @@ Allocator* PointerRegistry::get_allocator(void const* const ptr) const
 }
 
 void PointerRegistry::unsafe_reset_allocator(void const* const ptr,
-                                             Allocator* const new_alloc)
+                                             c10::Allocator* const new_alloc)
 {
   std::lock_guard<std::mutex> lock(m_registry_mtx);
   auto const it = m_registry.find(ptr);

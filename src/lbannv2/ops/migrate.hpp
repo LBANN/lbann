@@ -18,29 +18,36 @@ namespace lbannv2
  *         possible.
  *
  *  If we have an APU (e.g., MI300A), we are able to zero-copy migrate
- *  the memory CPU <-> GPU. The semantics differ from "to" in that the
- *  original tensor is considered "invalid" (implicitly, of course)
- *  after the migration.
+ *  the memory between the "cpu" backend and the "cuda" backend, under
+ *  certain circumstances. The semantics differ from the "to" operator
+ *  in the sense that the original tensor is considered "invalid"
+ *  (implicitly, of course) after the migration.
  *
- *  Additionally, on APU systems on which we have taken over the
- *  native PyTorch allocators, we can support migration of native
- *  Torch backend tensors (since we own the memory).
+ *  The primary prerequisite for migrating a tensor is that its
+ *  backing memory must have been allocated using a "cuda" allocator
+ *  (that is, somewhere in the allocator stack, the raw memory must
+ *  come from "hipMalloc" in the case of MI300A). LBANNv2 provides a
+ *  context manager that replaces the underlying CPU allocator with
+ *  one that allocates "cuda" memory, essentially providing
+ *  "migrateable" CPU tensors.
  *
- *  The behavior of this function depends on two bits of "external"
- *  state: the presence of APUs and whether LBANNv2 controls the
- *  memory allocators for native Torch backends. If LBANNv2 controls
- *  the native backend allocators, we can support zero-copy migration
- *  c10::kCPU <-> {lbannv2::LBANNDeviceT, 0} (and c10::kCUDA <->
- *  {LBANNDeviceT, 1} when GPU support is enabled). If LBANNv2 has APU
- *  support, we can move copylessly between CPU and GPU within LBANN
- *  and outside of LBANN if we also control those allocators.
+ *  At this time, we do NOT support IPC memory buffers or P2P device
+ *  memory access. Thus, tensors are only migrateable between the CPU
+ *  and whichever CUDA device their allocation is tied to. In the case
+ *  of CPU tensors allocated using the LBANNv2 allocator, this will be
+ *  whichever CUDA device was selected at the time of its allocation.
  *
  *  If we do not have an APU, this is just a direct call to "to".
  *
- *  The input tensor is invalidated to prevent foot wounds.
+ *  Upon successful migration, the input tensor is invalidated to
+ *  prevent foot wounds.
  *
- *  FIXME (trb): Get the op wrapper working.
  *  Schema: migrate(Tensor(a!), Device) -> Tensor(a!)
+ *
+ *  @param[in] t The tensor to (possibly) migrate.
+ *  @param[in] d The target device.
+ *
+ *  @returns A tensor associated with the given target device.
  */
 at::Tensor migrate(at::Tensor& t, c10::Device const& d);
 

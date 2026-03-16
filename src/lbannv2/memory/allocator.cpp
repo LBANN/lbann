@@ -6,10 +6,17 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include "lbannv2/memory/allocator.hpp"
 
-#include "lbannv2/memory/h2_allocator_wrappers.hpp"
 #include "lbannv2/memory/registry.hpp"
 #include "lbannv2/utils/errors.hpp"
 #include "lbannv2/utils/logging.hpp"
+
+#include <c10/core/CPUAllocator.h>
+
+#if LBANNV2_HAS_CUDA
+#include <ATen/cuda/CUDAContextLight.h>
+#elif LBANNV2_HAS_ROCM
+#include <ATen/hip/HIPContextLight.h>
+#endif
 
 #if LBANNV2_WITH_MI300A || LBANNV2_UNKNOWN_MI300A
 #include "lbannv2/memory/mi300a_allocator.hpp"
@@ -33,112 +40,36 @@ c10::DataPtr Allocator::allocate(size_t n)
 
 }  // namespace lbannv2
 
-namespace
-{
-using alloc_map_type = std::array<::lbannv2::Allocator*, 1 + LBANNV2_HAS_GPU>;
-
-lbannv2::Allocator& get_cpu_allocator()
-{
-#if LBANNV2_WITH_MI300A
-  return lbannv2::MI300Allocator::instance();
-#elif LBANNV2_WITHOUT_MI300A
-  return lbannv2::H2CPUAllocatorWrapper::instance();
-#elif LBANNV2_UNKNOWN_MI300A
-  if (h2::gpu::is_integrated())
-    return lbannv2::MI300Allocator::instance();
-  else
-    return lbannv2::H2CPUAllocatorWrapper::instance();
-#endif
-}
-
-alloc_map_type make_default_alloc_map()
-{
-  alloc_map_type map = {
-    &get_cpu_allocator(),
-#if LBANNV2_HAS_GPU
-    &::lbannv2::H2GPUAllocatorWrapper::instance(),
-#endif
-  };
-  return map;
-}
-
-alloc_map_type& alloc_map()
-{
-  static alloc_map_type allocators = make_default_alloc_map();
-  return allocators;
-}
-}  // namespace
-
-lbannv2::Allocator& lbannv2::get_pinned_memory_allocator()
-{
-  LBANNV2_WARN("No pinned allocator exposed yet; using regular CPU allocator.");
-  return get_allocator(c10::Device {c10::kCPU});
-}
-
-lbannv2::Allocator& lbannv2::get_allocator(c10::Device const& device,
-                                           bool pinned)
-{
-  if (pinned)
-  {
-    LBANNV2_ASSERT_ALWAYS(device.type() == c10::kCPU);
-    return get_pinned_memory_allocator();
-  }
-
-  size_t index = 0UL;
-  switch (device.type())
-  {
-  case c10::kCPU: index = 0UL; break;
-  case c10::kCUDA:
-  case c10::kHIP: index = 1UL; break;
-  default: throw std::runtime_error("lbannv2::get_allocator: bad device type");
-  }
-
-  auto* const alloc = alloc_map().at(index);
-
-  LBANNV2_ASSERT_ALWAYS(static_cast<bool>(alloc));
-  return *alloc;
-}
-
-void lbannv2::set_allocator(c10::Device const& device, Allocator* const alloc)
-{
-  LBANNV2_TRACE("lbannv2::set_allocator: device={}, alloc={}",
-                device.str(),
-                (void const*) alloc);
-
-  size_t index = 0UL;
-  switch (device.type())
-  {
-  case c10::kCPU: index = 0UL; break;
-  case c10::kCUDA:
-  case c10::kHIP: index = 1UL; break;
-  default: throw std::runtime_error("lbannv2::get_allocator: bad device type");
-  }
-  if (alloc_map().at(index) && alloc
-      && alloc_map().at(index)->get_device() == alloc->get_device())
-  {
-    alloc_map().at(index) = alloc;
-  }
-}
-
-void lbannv2::delete_managed_ptr(void* const ptr)
-{
-  LBANNV2_TRACE("delete_managed_ptr(ptr={})", ptr);
-  try
-  {
-    ::lbannv2::Allocator* alloc = pointer_registry().get_allocator(ptr);
-    LBANNV2_ASSERT_DEBUG(ptr == pointer_registry().get_context(ptr));
-    alloc->raw_deallocate(ptr);
-    pointer_registry().remove(ptr);
-  }
-  catch (UnknownAddress const&)
-  {
-    throw std::runtime_error("Ptr not allocated by this allocator.");
-  }
-  catch (std::runtime_error const&)
-  {}
-}
-
 bool lbannv2::is_managed_ptr(void const* const ptr) noexcept
 {
   return pointer_registry().known(ptr);
+}
+
+namespace
+{
+
+c10::Allocator* pt_orig_cpu_alloc_ = nullptr;
+
+}  // namespace
+
+void lbannv2::use_mi300a_cpu_allocator()
+{
+#if LBANNV2_WITH_MI300A || LBANNV2_UNKNOWN_MI300A
+#if LBANNV2_UNKNOWN_MI300A
+  if (gpu::is_integrated())
+#endif
+  {
+    if (!pt_orig_cpu_alloc_)
+      pt_orig_cpu_alloc_ = c10::GetCPUAllocator();
+    c10::SetCPUAllocator(&MI300Allocator::instance());
+    return;
+  }
+#endif
+  LBANNV2_WARN("No MI300A allocator available");
+}
+
+void lbannv2::use_torch_cpu_allocator()
+{
+  if (pt_orig_cpu_alloc_)
+    c10::SetCPUAllocator(pt_orig_cpu_alloc_);
 }

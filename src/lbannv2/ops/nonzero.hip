@@ -6,9 +6,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 #include "lbannv2/ops/nonzero.hpp"
 #include <lbannv2/memory/allocator.hpp>
+#include <lbannv2/utils/gpu_utils.hpp>
 #include <lbannv2/utils/logging.hpp>
-
-#include <h2/gpu/runtime.hpp>
 
 #include <ATen/hip/EmptyTensor.h>
 #include <ATen/hip/HIPContext.h>
@@ -103,8 +102,9 @@ void nonzero_out_mi300a_impl(at::Tensor const& self, at::Tensor& out)
   }
   // compute number of nonzero elements
   size_t temp_storage_bytes = 0;
-  auto& allocator = lbannv2::get_allocator(self.device());
-  auto num_nonzeros = allocator.allocate(sizeof(int) * num_chunks);
+  auto* const allocator = c10::GetAllocator(self.device().type());
+
+  auto num_nonzeros = allocator->allocate(sizeof(int) * num_chunks);
   for (int64_t idx = 0; idx < num_chunks; idx++)
   {
     int64_t remaining = std::min(chunk_size, self.numel() - idx * chunk_size);
@@ -117,7 +117,7 @@ void nonzero_out_mi300a_impl(at::Tensor const& self, at::Tensor& out)
                                             ((int*) num_nonzeros.get()) + idx,
                                             remaining,
                                             stream));
-    auto temp_storage = allocator.allocate(temp_storage_bytes);
+    auto temp_storage = allocator->allocate(temp_storage_bytes);
     AT_CUDA_CHECK(hipcub::DeviceReduce::Sum(temp_storage.get(),
                                             temp_storage_bytes,
                                             itr,
@@ -144,7 +144,7 @@ void nonzero_out_mi300a_impl(at::Tensor const& self, at::Tensor& out)
   //     stream);
 
   // TOM: ...just sync the stream...
-  H2_CHECK_HIP(hipStreamSynchronize(stream));
+  LBANNV2_CHECK_GPU(hipStreamSynchronize(stream));
 
   int64_t num_nonzeros_h = 0;
 
@@ -192,7 +192,7 @@ void nonzero_out_mi300a_impl(at::Tensor const& self, at::Tensor& out)
                                       ((int*) num_nonzeros.get()) + idx,
                                       remaining,
                                       stream));
-      auto temp_storage = allocator.allocate(temp_storage_bytes);
+      auto temp_storage = allocator->allocate(temp_storage_bytes);
       AT_CUDA_CHECK(hipcub::DeviceSelect::Flagged(
         temp_storage.get(),
         temp_storage_bytes,
