@@ -96,7 +96,7 @@ at::Tensor lbannv2::migrate(at::Tensor& t, c10::Device const& d)
   // We need to get the "real" "CUDA" target.
   c10::Device const real_tgt_d =
     (d.is_cuda() && !d.has_index())
-      ? c10::Device {c10::kCUDA, c10::hip::current_device()}
+      ? c10::Device {c10::kCUDA, gpu::current_device()}
       : d;
 
   // If the real_src_d is "cpu", it can be migrated to "cpu".
@@ -122,7 +122,8 @@ at::Tensor lbannv2::migrate(at::Tensor& t, c10::Device const& d)
   {
     c10::Stream stream = real_tgt_d.is_cpu()
                            ? c10::Stream {c10::Stream::DEFAULT, d}
-                           : c10::hip::getCurrentHIPStream(real_tgt_d.index());
+                           : getDeviceCurrentStream(real_tgt_d.index());
+
     lbannv2::migrate_ptr(t.storage().mutable_data_ptr(), d, stream);
 
     // Report the number of meaningful bytes migrated. This is
@@ -152,7 +153,7 @@ at::Tensor lbannv2::migrate(at::Tensor& t, c10::Device const& d)
 
     if (src_d.is_cuda())
     {
-      c10::hip::getCurrentHIPStream(src_d.index()).synchronize();
+      getDeviceCurrentStream(src_d.index()).synchronize();
     }
 
     return out;

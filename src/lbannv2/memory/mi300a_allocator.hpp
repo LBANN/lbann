@@ -48,10 +48,10 @@ private:
   MI300Allocator& operator=(MI300Allocator const&) = delete;
   MI300Allocator& operator=(MI300Allocator&&) = delete;
 
-#if LBANNV2_HAS_CUDA
-  using DeviceAlloc_t = c10_gpu::CUDACachingAllocator::CUDAAllocator;
-#elif LBANNV2_HAS_ROCM
-  using DeviceAlloc_t = c10_gpu::HIPCachingAllocator::HIPAllocator;
+#if LBANNV2_USE_C10_HIP_NAMESPACE_AND_SYMBOLS
+  using DeviceAlloc_t = ::c10::hip::HIPCachingAllocator::HIPAllocator;
+#else
+  using DeviceAlloc_t = ::c10::cuda::CUDACachingAllocator::CUDAAllocator;
 #endif
   DeviceAlloc_t* alloc_;
 

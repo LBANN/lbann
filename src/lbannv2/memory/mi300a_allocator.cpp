@@ -40,7 +40,7 @@ bool use_nonblocking_stream()
 
 struct StreamRAII
 {
-  lbannv2::c10_gpu::HIPStream stream;
+  ::lbannv2::TorchGPUStream_t stream;
 
   StreamRAII()
     : stream {lbannv2::c10_gpu::getStreamFromExternal(
@@ -60,7 +60,7 @@ struct StreamRAII
 };  // struct StreamRAII
 
 // Internal stream for managing "host" allocations through CUB
-lbannv2::c10_gpu::HIPStream host_allocation_stream(c10::DeviceIndex const idx)
+::lbannv2::TorchGPUStream_t host_allocation_stream(c10::DeviceIndex const idx)
 {
   static std::vector<StreamRAII> stream_raii(lbannv2::gpu::num_devices());
   LBANNV2_ASSERT_ALWAYS(idx >= 0 && idx < lbannv2::gpu::num_devices());
@@ -203,7 +203,7 @@ void lbannv2::migrate_ptr(c10::DataPtr& ptr,
   // Update the stream
   auto const new_stream = real_tgt_device.is_cpu()
                             ? host_allocation_stream(ptr_dev_idx)
-                            : c10_gpu::HIPStream(with_stream);
+                            : TorchGPUStream_t(with_stream);
 
   // UGH. Oh well.
   MI300Allocator().instance().alloc_->recordStream(ptr, new_stream);

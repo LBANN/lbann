@@ -13,6 +13,13 @@
 #include <ATen/hip/HIPContext.h>
 #include <hipcub/hipcub.hpp>
 
+// Note (trb): UGH PyTorch 2.11
+#ifdef C10_HIP_KERNEL_LAUNCH_CHECK
+#define LBANNV2_KERNEL_LAUNCH_CHECK() C10_HIP_KERNEL_LAUNCH_CHECK()
+#else
+#define LBANNV2_KERNEL_LAUNCH_CHECK() C10_CUDA_KERNEL_LAUNCH_CHECK()
+#endif
+
 namespace
 {
 template <typename T>
@@ -216,7 +223,7 @@ void nonzero_out_mi300a_impl(at::Tensor const& self, at::Tensor& out)
       int const nblocks = (num_nonzeros_h + nthreads - 1) / nthreads;
       write_indices<<<nblocks, nthreads, 0, stream>>>(
         out_temp.mutable_data_ptr<int64_t>(), dims, self.dim(), num_nonzeros_h);
-      C10_HIP_KERNEL_LAUNCH_CHECK();
+      LBANNV2_KERNEL_LAUNCH_CHECK();
     }
   }
   if (need_to_copy)

@@ -202,6 +202,16 @@ elseif (TARGET torch_hip)
   endforeach()
   set_target_properties(torch_hip
     PROPERTIES INTERFACE_COMPILE_OPTIONS "${_torch_hip_compile_opts}")
+
+  # FIXME (trb): So I really, truly hate this, but this seems to be
+  # the shortest approach to dealing with version-based switches in
+  # the C++ code. Other approaches involve obscure preprocessor macros
+  # or long-winded SFINAE tricks, and because I want you, dear human
+  # reader, to be happy, I opted for this very simple, highly readable
+  # implementation instead.
+  if (Torch_VERSION VERSION_LESS "2.11.0")
+    set(LBANNV2_USE_C10_HIP_NAMESPACE_AND_SYMBOLS TRUE)
+  endif ()
 endif ()
 
 # We need to determine if we should be using a CXX11_ABI macro or not
