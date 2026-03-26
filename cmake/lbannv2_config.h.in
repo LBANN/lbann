@@ -26,6 +26,8 @@
 #cmakedefine01 LBANNV2_WITHOUT_MI300A
 #cmakedefine01 LBANNV2_UNKNOWN_MI300A
 
+#cmakedefine01 LBANNV2_USE_C10_HIP_NAMESPACE_AND_SYMBOLS
+
 #ifndef SPDLOG_ACTIVE_LEVEL
 // This defaults to "TRACE" so that all messages are compiled and
 // available. Use the runtime environment variable to control which

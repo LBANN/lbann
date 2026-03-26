@@ -25,6 +25,7 @@
 #elif LBANNV2_HAS_ROCM
 
 #include <c10/hip/HIPFunctions.h>
+#include <c10/hip/HIPStream.h>
 
 #include <stdexcept>
 
@@ -45,10 +46,14 @@
 
 namespace lbannv2
 {
-#if LBANNV2_HAS_CUDA
-namespace c10_gpu = c10::cuda;
-#elif LBANNV2_HAS_ROCM
+#if LBANNV2_USE_C10_HIP_NAMESPACE_AND_SYMBOLS
 namespace c10_gpu = c10::hip;
+using TorchGPUStream_t = c10::hip::HIPStream;
+inline auto& getDeviceCurrentStream = c10::hip::getCurrentHIPStream;
+#elif LBANNV2_HAS_GPU
+namespace c10_gpu = c10::cuda;
+using TorchGPUStream_t = c10::cuda::CUDAStream;
+inline auto& getDeviceCurrentStream = c10::cuda::getCurrentCUDAStream;
 #endif
 
 inline constexpr bool has_cuda() noexcept
