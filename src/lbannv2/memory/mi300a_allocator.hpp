@@ -30,9 +30,9 @@ class MI300Allocator final : public Allocator
 public:
   void copy_data(void* dst, void const* src, size_t bytes) const final;
 
-  void* raw_allocate(size_t nbytes) final;
+  void* raw_alloc(size_t nbytes) final;
 
-  void raw_deallocate(void* ptr) final;
+  void raw_dealloc(void* ptr) final;
 
   c10::DeleterFnPtr raw_deleter() const final;
 

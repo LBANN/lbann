@@ -18,8 +18,8 @@ namespace lbannv2
 class LBANNV2_EXPORT Allocator : public c10::Allocator
 {
 public:
-  virtual void* raw_allocate(size_t nbytes) = 0;
-  virtual void raw_deallocate(void* ptr) = 0;
+  virtual void* raw_alloc(size_t nbytes) = 0;
+  virtual void raw_dealloc(void* ptr) = 0;
   virtual c10::Device get_device() const noexcept = 0;
 
   c10::DataPtr allocate(size_t n) final;

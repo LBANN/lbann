@@ -78,7 +78,7 @@ c10::Device resolve_device(c10::Device const& d)
 void delete_mi300a_ptr(void* ptr)
 {
   lbannv2::pointer_registry().remove(ptr);
-  lbannv2::MI300Allocator::instance().raw_deallocate(ptr);
+  lbannv2::MI300Allocator::instance().raw_dealloc(ptr);
 }
 }  // namespace
 
@@ -112,7 +112,7 @@ void MI300Allocator::copy_data(void* const dst,
   std::memcpy(dst, src, bytes);
 }
 
-void* MI300Allocator::raw_allocate(size_t const nbytes)
+void* MI300Allocator::raw_alloc(size_t const nbytes)
 {
   auto* const ptr = alloc_->raw_alloc_with_stream(
     nbytes, host_allocation_stream(lbannv2::gpu::current_device()));
@@ -127,7 +127,7 @@ void* MI300Allocator::raw_allocate(size_t const nbytes)
   return ptr;
 }
 
-void MI300Allocator::raw_deallocate(void* ptr)
+void MI300Allocator::raw_dealloc(void* ptr)
 {
   LBANNV2_TRACE("MI300Allocator::raw_deallocate(ptr={})", ptr);
   alloc_->raw_delete(ptr);
@@ -140,7 +140,7 @@ c10::Device MI300Allocator::get_device() const noexcept
 
 c10::DeleterFnPtr MI300Allocator::raw_deleter() const
 {
-  return delete_mi300a_ptr;
+  return alloc_->raw_deleter();// delete_mi300a_ptr;
 }
 
 MI300Allocator& MI300Allocator::instance()

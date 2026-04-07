@@ -28,11 +28,11 @@ namespace lbannv2
 c10::DataPtr Allocator::allocate(size_t n)
 {
   // Do the allocation
-  void* const buffer = raw_allocate(n);
+  void* const buffer = this->raw_alloc(n);
 
   // Log the allocation
   LBANNV2_TRACE("Allocator::allocate(n={}, ptr={})", n, buffer);
-  pointer_registry().add(buffer, n, this);
+  //pointer_registry().add(buffer, n, this);
 
   // Decorate the allocation.
   return {buffer, buffer, this->raw_deleter(), this->get_device()};
