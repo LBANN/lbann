@@ -85,7 +85,7 @@ void lbannv2_report_free(DeviceAlloc_ns::TraceEntry const& entry)
 {
   try
   {
-    void * const ptr = reinterpret_cast<void*>(entry.addr_);
+    void* const ptr = reinterpret_cast<void*>(entry.addr_);
     lbannv2::pointer_registry().remove(ptr);
     LBANNV2_TRACE("Deallocate (ptr={})", (void const*) ptr);
   }
@@ -163,7 +163,7 @@ c10::Device MI300Allocator::get_device() const noexcept
 
 c10::DeleterFnPtr MI300Allocator::raw_deleter() const
 {
-  return alloc_->raw_deleter();// delete_mi300a_ptr;
+  return alloc_->raw_deleter();
 }
 
 MI300Allocator& MI300Allocator::instance()
