@@ -75,10 +75,30 @@ c10::Device resolve_device(c10::Device const& d)
   return d;
 }
 
-void delete_mi300a_ptr(void* ptr)
+#if LBANNV2_USE_C10_HIP_NAMESPACE_AND_SYMBOLS
+namespace DeviceAlloc_ns = c10::hip::HIPCachingAllocator;
+#else
+namespace DeviceAlloc_ns = c10::cuda::CUDACachingAllocator;
+#endif
+
+void lbannv2_report_free(DeviceAlloc_ns::TraceEntry const& entry)
 {
-  lbannv2::pointer_registry().remove(ptr);
-  lbannv2::MI300Allocator::instance().raw_dealloc(ptr);
+  try
+  {
+    void * const ptr = reinterpret_cast<void*>(entry.addr_);
+    lbannv2::pointer_registry().remove(ptr);
+    LBANNV2_TRACE("Deallocate (ptr={})", (void const*) ptr);
+  }
+  catch (lbannv2::UnknownAddress const&)
+  {
+    // ignore -- ptr allocated in Torch
+  }
+}
+
+void lbannv2_trace_alloc(DeviceAlloc_ns::TraceEntry const& entry)
+{
+  if (entry.action_ == DeviceAlloc_ns::TraceEntry::FREE_COMPLETED)
+    lbannv2_report_free(entry);
 }
 }  // namespace
 
@@ -99,6 +119,9 @@ MI300Allocator::MI300Allocator()
   LBANNV2_ASSERT_ALWAYS(dev_alloc);
   if (!dev_alloc->initialized())
     dev_alloc->init(gpu::num_devices());
+
+  // Trace memory stuff
+  dev_alloc->attachAllocatorTraceTracker(lbannv2_trace_alloc);
 
   alloc_ = dev_alloc;
 }
@@ -206,7 +229,7 @@ void lbannv2::migrate_ptr(c10::DataPtr& ptr,
                             : TorchGPUStream_t(with_stream);
 
   // UGH. Oh well.
-  MI300Allocator().instance().alloc_->recordStream(ptr, new_stream);
+  MI300Allocator::instance().alloc_->recordStream(ptr, new_stream);
 
   // Finally, update the DataPtr itself
   ptr.unsafe_set_device(real_tgt_device);
