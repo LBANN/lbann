@@ -50,11 +50,11 @@ c10::Device lbann_cpu() noexcept
 {
   return c10::Device {c10::kCPU};
 }
-// c10::Device lbann_gpu() noexcept
-// {
-//   return c10::Device {
-//     c10::kCUDA, static_cast<c10::DeviceIndex>(lbannv2::gpu::current_device())};
-// }
+c10::Device lbann_gpu() noexcept
+{
+  return c10::Device {
+    c10::kCUDA, static_cast<c10::DeviceIndex>(lbannv2::gpu::current_device())};
+}
 }  // namespace
 
 TEST_CASE("MI300Allocator::allocate and MI300Allocator::deallocate",
@@ -76,4 +76,59 @@ TEST_CASE("MI300Allocator::allocate and MI300Allocator::deallocate",
   // DataPtr goes out of scope, should be deleted.
 
   CHECK(!lbannv2::pointer_registry().known(raw_ptr));
+}
+
+// The "kernel" here is loosely inspired by Aluminum's "GPUWait", but
+// less fussy about things like "cache-line allocation" and
+// "atomics"... All I need is something to guarantee the stream isn't
+// synced before the second allocation, and this saves me the trouble
+// of compiling a HIP kernel.
+TEST_CASE("MI300Allocator stream semantics are working", "[memory][mi300a]")
+{
+  auto const gpu = lbann_gpu();
+
+  // Some memory we can use later.
+  int32_t* wait_mem;
+  LBANNV2_CHECK_GPU(hipMalloc(&wait_mem, sizeof(int32_t)));
+  *wait_mem = 0;
+
+  int32_t const wait_value = 1;
+  auto& alloc = lbannv2::MI300Allocator::instance();
+  size_t const size = 64;
+
+  // open block
+  //   do an allocation
+  //   migrate allocation to GPU
+  //   "run a kernel" on the same stream
+  // close block (delete the allocation)
+  // allocate new buffer
+  // check old and new buffers have different addresses
+
+  auto torch_stream = lbannv2::getDeviceCurrentStream(gpu.index());
+  void* orig_ptr = nullptr;  // never dereferenced
+  {
+    auto ptr = alloc.allocate(size);
+    // cache the buffer address -- NEVER DEREFERENCED
+    orig_ptr = ptr.get();
+
+    // Add the ptr to the stream on GPU
+    lbannv2::migrate_ptr(ptr, gpu, torch_stream);
+    // Fake a kernel on the stream
+    LBANNV2_CHECK_GPU(hipStreamWaitValue32(
+      torch_stream, wait_mem, wait_value, hipStreamWaitValueEq));
+  }
+  // GPU allocation will "FREE_REQUESTED" here, but it should NOT be
+  // available for reuse
+
+  auto ptr = alloc.allocate(size);
+  CHECK(ptr.get() != orig_ptr);  // NOT REQUIRE -- need to clean up.
+
+  // Write the new value
+  *wait_mem = wait_value;
+
+  // Ensure the "kernel" is done.
+  torch_stream.synchronize();
+
+  // Free our wait memory
+  LBANNV2_CHECK_GPU(hipFree(wait_mem));
 }

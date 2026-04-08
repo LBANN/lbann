@@ -4,6 +4,9 @@
 #include <c10/core/Device.h>
 
 #if LBANNV2_HAS_CUDA
+
+#include <lbannv2/utils/logging.hpp>
+
 #include <c10/cuda/CUDAFunctions.h>
 
 #include <stdexcept>
@@ -23,6 +26,8 @@
   } while (0)
 
 #elif LBANNV2_HAS_ROCM
+
+#include <lbannv2/utils/logging.hpp>
 
 #include <c10/hip/HIPFunctions.h>
 #include <c10/hip/HIPStream.h>
